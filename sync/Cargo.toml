@@ -1,0 +1,25 @@
+[package]
+name = "sync"
+version = "0.1.0"
+authors = ["luozijun <luozijun.assistant@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+getopts    = "0.2"
+# NOTE: Hyper 并没有升级到 V0.3
+tokio      = "0.2"
+hyper      = "0.13"
+hyper-tls  = "0.4"
+
+[features]
+default = [
+    "tokio/macros",
+    "tokio/dns",
+    "tokio/net",
+    "tokio/io-util",
+    "tokio/io-std",
+    "tokio/io-driver",
+    "tokio/rt-threaded",
+]
