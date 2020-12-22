@@ -398,8 +398,6 @@ impl FromStr for Record {
             return Err(ParseError::Truncated);
         }
         
-        // println!("{:?}", fields);
-
         let src_registry = Registry::from_str(fields[0])?;
         let cc = if fields[1].trim() == "" { "ZZ" } else { fields[1] };
         let country_code = Country::from_str(cc)?;
@@ -562,7 +560,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
         println!("[ERROR] data path not exists.");
         std::process::exit(1);
     }
-    
+
     let record_sets = parse(&data_path)?;
 
     let mut v4_records: Vec<&Record> = record_sets.iter().filter(|record| {
