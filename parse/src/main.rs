@@ -20,6 +20,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 
 mod status;
+#[path = "../../src/country.rs"]
 mod country;
 mod registry;
 
@@ -764,6 +765,6 @@ int main(int argc, char const *argv[]) {
         $ time cc -std=c17 src/v4_db.c -o v4
         $ time cc -std=c17 src/v6_db.c -o v6
     ");
-    
+
     Ok(())
 }

@@ -303,7 +303,7 @@ impl Country {
     pub const AP: Self = Self(250);
     pub const ZZ: Self = Self(251);
 
-    
+
     #[inline]
     pub fn from_index(idx: u8) -> Self {
         assert!((idx as usize) < COUNTRY_CODES_LEN);
@@ -341,16 +341,25 @@ impl FromStr for Country {
     type Err = InvalidCountryCode;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        COUNTRY_CODES
-            .binary_search_by(|&(code, _)| code.cmp(s))
-            .map_err(|_| InvalidCountryCode)
-            .map(|idx| Self(idx as u8))
+        for (idx, &(cc, _full_name)) in COUNTRY_CODES.iter().enumerate() {
+            if cc == s {
+                return Ok(Self(idx as u8))
+            }
+        }
+
+        return Err(InvalidCountryCode);
     }
 }
 
 impl fmt::Debug for Country {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
        write!(f, "{:?}", self.code())
+    }
+}
+
+impl fmt::Display for Country {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+       write!(f, "{}", self.code())
     }
 }
 
