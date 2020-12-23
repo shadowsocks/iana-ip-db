@@ -273,7 +273,7 @@ pub enum Country {
     // NOTE: 以下 CountryCode 为 IANA 自定义代码，并不在 ISO 编码列表里面。
     EU = 249u8,
     AP = 250u8,
-    ZZ = 255u8,
+    ZZ = 251u8,
 }
 
 
@@ -532,7 +532,7 @@ impl Country {
             248 => Ok(Country::ZW),
             249 => Ok(Country::EU),
             250 => Ok(Country::AP),
-            255 => Ok(Country::ZZ),
+            251 => Ok(Country::ZZ),
             _ => Err(()),
         }
     }
@@ -790,7 +790,7 @@ impl Country {
             Country::ZW => 248,
             Country::EU => 249,
             Country::AP => 250,
-            Country::ZZ => 255,
+            Country::ZZ => 251,
         }
     }
 
