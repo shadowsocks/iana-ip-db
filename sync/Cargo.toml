@@ -15,11 +15,6 @@ hyper-tls  = "0.4"
 
 [features]
 default = [
-    "tokio/macros",
     "tokio/dns",
-    "tokio/net",
-    "tokio/io-util",
-    "tokio/io-std",
-    "tokio/io-driver",
     "tokio/rt-threaded",
 ]

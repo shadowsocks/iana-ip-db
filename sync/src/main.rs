@@ -53,30 +53,36 @@ async fn sync(data_path: PathBuf, filename: &str, fileurl: &str) -> Result<(), B
     let md5_filepath = data_path.join(format!("{}.md5", filename));
     let md5_fileuri  = (format!("{}.md5", fileuri)).parse::<Uri>()?;
 
-    // NOTE: delegated-iana-latest 文件没有 MD5 校验码。
     if filename != "delegated-iana-latest" {
-        let md5_file_content: Bytes = fetch(md5_fileuri).await?;
-
         let mut old_md5_file_content = Vec::new();
+
         if !md5_filepath.exists() {
             File::create(&md5_filepath)?;
         } else {
             old_md5_file_content = std::fs::read(&md5_filepath)?;
         }
 
+        let md5_file_content: Bytes = fetch(md5_fileuri).await?;
+
         if md5_file_content.is_empty() || md5_file_content != old_md5_file_content {
             // NOTE: 数据需要更新
+            let content: Bytes = fetch(fileuri).await?;
+            let mut file = OpenOptions::new().create(true).write(true).append(false).open(&filepath)?;
+            file.write_all(&content)?;
+
+            // 更新 MD5 校验文件
             let mut file = OpenOptions::new().create(false).write(true).append(false).open(&md5_filepath)?;
             file.write_all(&md5_file_content)?;
         } else {
             // NOTE: 数据不需要更新
             return Ok(());
         }
+    } else {
+        // NOTE: delegated-iana-latest 文件没有 MD5 校验码。
+        let content: Bytes = fetch(fileuri).await?;
+        let mut file = OpenOptions::new().create(true).write(true).append(false).open(&filepath)?;
+        file.write_all(&content)?;
     }
-
-    let content: Bytes = fetch(fileuri).await?;
-    let mut file = OpenOptions::new().create(true).write(true).append(false).open(&filepath)?;
-    file.write_all(&content)?;
 
     Ok(())
 }
@@ -107,10 +113,7 @@ fn boot() -> PathBuf {
     Path::new(value.to_lowercase().as_str()).to_path_buf()
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>>{
-    let data_path = boot();
-    
+async fn run(data_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     if !data_path.exists() {
         fs::create_dir(&data_path)?;
     }
@@ -118,30 +121,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     println!("Data Path: {:?}", &data_path);
     println!();
     
-    let mut tasks = Vec::new();
     for rir_file in IANA_RIR_FILES.iter() {
         let filename  = rir_file.0;
         let fileurl   = rir_file.1;
         let data_path = data_path.clone();
 
-        let handle = tokio::spawn(async move {
-            let ret = sync(data_path, filename, fileurl).await;
-            match ret {
-                Ok(_) => {
-                    println!("{:34}  [\x1b[32mOK\x1b[0m]", filename);
-                },
-                Err(e) => {
-                    println!("{:34} [FAILED] [\x1b[31mFAILED\x1b[0m]  {:?}", filename, e);
-                }
+        print!("sync {:34} ...", filename);
+
+        let ret = sync(data_path, filename, fileurl).await;
+        match ret {
+            Ok(_) => {
+                println!("    [\x1b[32mOK\x1b[0m]");
+            },
+            Err(e) => {
+                println!("    [\x1b[31mFAILED\x1b[0m]  {:?}", e);
             }
-        });
-
-        tasks.push(handle);
+        }
     }
 
-    while let Some(handle) = tasks.pop() {
-        handle.await?;
-    }
+    Ok(())
+}
+
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let data_path = boot();
     
+    let mut rt  = tokio::runtime::Runtime::new()?;
+    rt.block_on(run(data_path))?;
+
     Ok(())
 }
