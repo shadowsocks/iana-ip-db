@@ -341,6 +341,31 @@ impl Record {
                 ip_to_number_string(last_ip),
                 self.country.index())
     }
+
+    pub fn codegen_c(&self) -> String {
+        let first_ip = self.ip_block.first();
+        let last_ip = self.ip_block.last();
+        
+        let ip_to_number_string = |ipaddr| -> String {
+            match ipaddr {
+                IpAddress::Ipv4(v4_addr) => format!("{}", u32::from(Ipv4Addr::from(v4_addr))),
+                IpAddress::Ipv6(v6_addr) => {
+                    // ((__uint128_t)0x75f17d6b3588f843 << 64) | 0xb13dea7c9c324e51
+                    let n = u128::from(Ipv6Addr::from(v6_addr.0));
+                    let hi = (n >> 64) as u64;
+                    let lo = n as u64;
+                    // format!("((__uint128_t){} << 64) | (__uint64_t){}", hi, lo)
+                    format!("U128({}U, {}U)", hi, lo)
+                },
+                _ => unreachable!()
+            }
+        };
+        
+        format!("{{ {}, {}, {} }}",
+                ip_to_number_string(first_ip),
+                ip_to_number_string(last_ip),
+                self.country.index())
+    }
 }
 
 impl Ord for Record {
@@ -400,11 +425,12 @@ impl FromStr for Record {
         
         let src_registry = Registry::from_str(fields[0])?;
         let cc = if fields[1].trim() == "" { "ZZ" } else { fields[1] };
-        let country_code = Country::from_str(cc)?;
         let type_  = fields[2];
 
         match type_ {
             "ipv4" => {
+                let country_code = Country::from_str(cc)?;
+
                 let start: Ipv4Addr = fields[3].parse().map_err(|_| ParseError::Unrecognized)?;
                 let start_ip = Ipv4Address(start.octets());
                 let nums: u32 = fields[4].parse().map_err(|_| ParseError::Unrecognized)?;
@@ -413,7 +439,8 @@ impl FromStr for Record {
 
                 let status_ = fields[6];
                 let (status, dst_registry) = if src_registry == Registry::Iana {
-                    (Status::Assigned, Some(Registry::from_str(fields[7])?))
+                    let dst_registry = if fields.len() == 7 { fields[6] } else { fields[7] };
+                    (Status::Assigned, Some(Registry::from_str(dst_registry)?))
                 } else {
                     (Status::from_str(status_)?, None)
                 };
@@ -431,6 +458,8 @@ impl FromStr for Record {
                 Ok(record)
             }
             "ipv6" => {
+                let country_code = Country::from_str(cc)?;
+
                 let start: Ipv6Addr = fields[3].parse().map_err(|_| ParseError::Unrecognized)?;
                 let start_ip = Ipv6Address(start.octets());
                 let prefix_len: u8 = fields[4].parse().map_err(|_| ParseError::Unrecognized)?;
@@ -439,7 +468,8 @@ impl FromStr for Record {
 
                 let status_ = fields[6];
                 let (status, dst_registry) = if src_registry == Registry::Iana {
-                    (Status::Assigned, Some(Registry::from_str(fields[7])?))
+                    let dst_registry = if fields.len() == 7 { fields[6] } else { fields[7] };
+                    (Status::Assigned, Some(Registry::from_str(dst_registry)?))
                 } else {
                     (Status::from_str(status_)?, None)
                 };
@@ -458,6 +488,7 @@ impl FromStr for Record {
             }
             _ => {
                 // Not an IPv4 or IPv6 Record Line.
+                // ASN
                 Err(ParseError::Dropped)
             }
         }
@@ -508,12 +539,14 @@ fn parse(data_path: &PathBuf) -> Result<HashSet<Record>, Box<dyn std::error::Err
                 Err(e) => {
                     match e {
                         ParseError::Dropped => {
-
+                            // Not an IPv4 or IPv6 Record Line.
+                            // AS record.
+                        },
+                        ParseError::InvalidCountryCode | ParseError::Truncated => {
+                            println!("[ERROR] {}  Line: {:?}", e, line);
                         },
                         _ => {
-                            let fields: Vec<&str> = line.split("|").collect();
-                            println!("Line: {:?}", fields);
-                            println!("Error: {:?}", e);
+                            println!("Line: {:?}", line);
                             return Err(Box::new(e));
                         }
                     }
@@ -642,6 +675,95 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
                                 v6_db.len(),
                                 v6_db.join(",\n"))
                                     .as_bytes())?;
+    v4_db_file.write_all(r###"
 
+fn main() {
+    println!("{:?}", IPV4_RECORDS[100]);
+}"###.as_bytes())?;
+
+    v6_db_file.write_all(r###"
+
+fn main() {
+    println!("{:?}", IPV6_RECORDS[100]);
+}"###.as_bytes())?;
+
+    // C codegen
+    // cc -std=c17 src/v6_db.c
+    let _ = fs::remove_file("src/v4_db.c");
+    let _ = fs::remove_file("src/v6_db.c");
+
+    let mut v4_db_file_c = OpenOptions::new().create(true).write(true).append(true)
+                        .open("src/v4_db.c")?;
+    let mut v6_db_file_c = OpenOptions::new().create(true).write(true).append(true)
+                        .open("src/v6_db.c")?;
+
+    v4_db_file_c.write_all(b"\
+#include <stdio.h>
+#include <stdint.h>
+
+struct ipv4_record {
+    uint32_t first_ip;
+    uint32_t last_ip;
+    uint8_t  country_code;
+};
+
+")?;
+        v6_db_file_c.write_all(b"\
+#include <stdio.h>
+#include <stdint.h>
+
+typedef __uint128_t uint128_t;
+
+struct ipv6_record {
+    uint128_t first_ip;
+    uint128_t last_ip;
+    uint8_t  country_code;
+};
+
+// ((__uint128_t)0x75f17d6b3588f843 << 64) | 0xb13dea7c9c324e51
+#define U128(hi, lo) ((__uint128_t)hi << 64) | (__uint64_t)lo
+
+")?;
+    let v4_db_c = v4_records.iter().map(|record| format!("    {}", record.codegen_c()) ).collect::<Vec<String>>();
+    let v6_db_c = v6_records.iter().map(|record| format!("    {}", record.codegen_c()) ).collect::<Vec<String>>();
+    v4_db_file_c.write(format!("static struct ipv4_record IPV4_RECORDS[{}] = {{\n{}\n}};",
+                                v4_db_c.len(),
+                                v4_db_c.join(",\n"))
+                                    .as_bytes())?;
+    v6_db_file_c.write(format!("static struct ipv6_record IPV6_RECORDS[{}] = {{\n{}\n}};",
+                                v6_db_c.len(),
+                                v6_db_c.join(",\n"))
+                                    .as_bytes())?;
+    let s = r###"
+void display_u128(__uint128_t num) {
+    printf("0x%llx%llx", (uint64_t)(num >> 64), (uint64_t)num);
+}
+int main(int argc, char const *argv[]) {
+    display_u128(IPV6_RECORDS[100].first_ip);
+    printf(", ");
+    display_u128(IPV6_RECORDS[100].last_ip);
+    printf(", %d\n", IPV6_RECORDS[100].country_code);
+
+    return 0;
+}
+"###;
+    v6_db_file_c.write_all(s.as_bytes())?;
+    v4_db_file_c.write_all(r###"
+int main(int argc, char const *argv[]) {
+    printf("%d, %d, %d\n", IPV4_RECORDS[100].first_ip, IPV4_RECORDS[100].last_ip, IPV4_RECORDS[100].country_code);
+
+    return 0;
+}
+"###.as_bytes())?;
+
+
+    println!("
+        $ time rustc src/v4_db.rs
+        $ time rustc src/v6_db.rs
+
+        $ time cc -std=c17 src/v4_db.c -o v4
+        $ time cc -std=c17 src/v6_db.c -o v6
+    ");
+    
     Ok(())
 }

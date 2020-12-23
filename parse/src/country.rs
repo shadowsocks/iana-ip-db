@@ -269,8 +269,11 @@ pub enum Country {
     YE = 246u8,
     ZM = 247u8,
     ZW = 248u8,
+
+    // NOTE: 以下 CountryCode 为 IANA 自定义代码，并不在 ISO 编码列表里面。
     EU = 249u8,
-    ZZ = 250u8,
+    AP = 250u8,
+    ZZ = 255u8,
 }
 
 
@@ -528,7 +531,8 @@ impl Country {
             247 => Ok(Country::ZM),
             248 => Ok(Country::ZW),
             249 => Ok(Country::EU),
-            250 => Ok(Country::ZZ),
+            250 => Ok(Country::AP),
+            255 => Ok(Country::ZZ),
             _ => Err(()),
         }
     }
@@ -785,7 +789,8 @@ impl Country {
             Country::ZM => 247,
             Country::ZW => 248,
             Country::EU => 249,
-            Country::ZZ => 250,
+            Country::AP => 250,
+            Country::ZZ => 255,
         }
     }
 
@@ -1041,6 +1046,7 @@ impl Country {
             Country::ZM => "Zambia",
             Country::ZW => "Zimbabwe",
             Country::EU => "Europe",
+            Country::AP => "AP",
             Country::ZZ => "Unknown or unspecified country",
         }
     }
@@ -1301,7 +1307,9 @@ impl FromStr for Country {
             "YE" => Ok(Country::YE),
             "ZM" => Ok(Country::ZM),
             "ZW" => Ok(Country::ZW),
+
             "EU" => Ok(Country::EU),
+            "AP" => Ok(Country::AP),
             "ZZ" => Ok(Country::ZZ),
                _ => Err(InvalidCountryCode),
         }
@@ -1562,6 +1570,7 @@ impl fmt::Display for Country {
             Country::ZM => write!(f, "ZM"),
             Country::ZW => write!(f, "ZW"),
             Country::EU => write!(f, "EU"),
+            Country::AP => write!(f, "AP"),
             Country::ZZ => write!(f, "ZZ"),
         }
     }
