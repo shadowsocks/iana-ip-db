@@ -8,8 +8,26 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 
+#[derive(Copy, Clone, Hash, PartialEq, Eq)]
+pub enum Action {
+    Accept,
+    Reject,
+    Unknow,
+}
+
+impl std::fmt::Debug for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Action::Accept => write!(f, "ACCEPT"),
+            Action::Reject => write!(f, "REJECT"),
+            Action::Unknow => write!(f, "UNKNOW"),
+        }
+    }
+}
+
+
 pub struct Whitelist {
-    cache: HashMap<IpAddr, bool>,
+    cache: HashMap<IpAddr, Action>,
     loc_set: HashSet<Country>,
 }
 
@@ -20,7 +38,7 @@ impl Whitelist {
         Self { cache, loc_set }
     }
 
-    pub fn contains(&mut self, addr: &IpAddr) -> bool {
+    pub fn ask(&mut self, addr: &IpAddr) -> Action {
         if let Some(v) = self.cache.get(addr) {
             return *v;
         }
@@ -28,10 +46,11 @@ impl Whitelist {
         match lookup(addr) {
             Some((_start, _end, cc)) => {
                 let v = self.loc_set.contains(&cc);
-                self.cache.insert(addr.clone(), v);
-                v
+                let act = if v { Action::Reject } else { Action::Accept };
+                self.cache.insert(addr.clone(), act);
+                act
             },
-            None => false,
+            None => Action::Unknow,
         }
     }
 }
@@ -58,22 +77,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     let ip  = "1.1.1.1".parse::<IpAddr>()?;
-    let val = acl.contains(&ip);
-    println!("[{}] {}", if val { "ACCEPT" } else { "REJECT" }, &ip);
+    println!("[{:?}] {}", acl.ask(&ip), &ip);
     
-
     let ip  = "8.8.8.8".parse::<IpAddr>()?;
-    let val = acl.contains(&ip);
-    println!("[{}] {}", if val { "ACCEPT" } else { "REJECT" }, &ip);
-
+    println!("[{:?}] {}", acl.ask(&ip), &ip);
 
     let ip  = "220.181.38.148".parse::<IpAddr>()?; // baidu.com
-    let val = acl.contains(&ip);
-    println!("[{}] {}", if val { "ACCEPT" } else { "REJECT" }, &ip);
+    println!("[{:?}] {}", acl.ask(&ip), &ip);
 
-    let ip  = "5.42.250.33".parse::<IpAddr>()?; // www.moh.gov.sa
-    let val = acl.contains(&ip);
-    println!("[{}] {}", if val { "ACCEPT" } else { "REJECT" }, &ip);
+    let ip  = "5.42.250.33".parse::<IpAddr>()?;    // www.moh.gov.sa
+    println!("[{:?}] {}", acl.ask(&ip), &ip);
+
 
     Ok(())
 }
