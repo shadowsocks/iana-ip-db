@@ -146,7 +146,7 @@ async fn run(data_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data_path = boot();
     
-    let mut rt  = tokio::runtime::Runtime::new()?;
+    let rt  = tokio::runtime::Runtime::new()?;
     rt.block_on(run(data_path))?;
 
     Ok(())

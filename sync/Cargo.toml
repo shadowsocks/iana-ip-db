@@ -8,13 +8,13 @@ edition = "2018"
 
 [dependencies]
 getopts    = "0.2"
-# NOTE: Hyper 并没有升级到 V0.3
-tokio      = "0.2"
-hyper      = "0.13"
-hyper-tls  = "0.4"
+tokio      = "1.0"
+hyper      = "0.14"
+hyper-tls  = "0.5"
 
 [features]
 default = [
-    "tokio/dns",
-    "tokio/rt-threaded",
+    "tokio/rt-multi-thread",
+    "hyper/client",
+    "hyper/http1",
 ]
